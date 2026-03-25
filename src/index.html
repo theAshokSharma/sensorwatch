@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SensorWatch · Live Monitor</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MQTT.js (WebSocket client) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       CONFIG MODAL
+  ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2>Connect to Broker</h2>
+      <p>MQTT · WebSocket · Configure your connection</p>
+
+      <div class="field">
+        <label>Broker URL (ws:// or wss://)</label>
+        <input id="f-url" type="text" placeholder="ws://localhost:9001" />
+      </div>
+
+      <div class="field">
+        <label>Username</label>
+        <input id="f-user" type="text" placeholder="login-id" autocomplete="username" />
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input id="f-pass" type="password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+
+      <div class="field">
+        <label>Topics (comma-separated)</label>
+        <input id="f-topics" type="text" placeholder="LEAK, PRESSURE, TEMP" />
+      </div>
+
+      <button class="btn-connect" id="btn-connect">Connect →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       MAIN APP
+  ══════════════════════════════════════════ -->
+  <div class="app">
+
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <div class="logo-icon">⬡</div>
+        <div class="logo-text">
+          <h1>SensorWatch</h1>
+          <span>Live MQTT Monitor</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="connection-badge" id="conn-badge">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="conn-label">Disconnected</span>
+        </div>
+        <button class="config-btn" id="btn-settings">⚙ Settings</button>
+      </div>
+    </header>
+
+    <!-- Timestamp bar -->
+    <div class="timestamp-bar">
+      <span>SENSOR READINGS</span>
+      <span id="clock">—</span>
+    </div>
+
+    <!-- ── Sensor Cards ── -->
+    <div class="cards">
+
+      <!-- LEAK -->
+      <div class="card" id="card-leak" data-status="idle">
+        <div class="card-header">
+          <div class="card-label">Leak Detection</div>
+          <div class="card-icon" id="leak-icon">💧</div>
+        </div>
+        <div id="leak-badge" class="badge idle">
+          <span id="leak-dot">●</span>
+          <span id="leak-text">Awaiting data…</span>
+        </div>
+        <div class="card-sub">
+          <span>Last msg:</span>
+          <span class="tick" id="leak-ts">—</span>
+        </div>
+      </div>
+
+      <!-- PRESSURE -->
+      <div class="card" id="card-pressure" data-status="idle">
+        <div class="card-header">
+          <div class="card-label">Pressure</div>
+          <div class="card-icon" id="pressure-icon">🔩</div>
+        </div>
+        <div>
+          <span class="card-value idle-val" id="pressure-val">—</span>
+          <span class="card-unit">hPa</span>
+        </div>
+        <div class="gauge-wrap">
+          <div class="gauge-labels">
+            <span id="gauge-min">0</span>
+            <span id="gauge-max">200</span>
+          </div>
+          <div class="gauge-track">
+            <div class="gauge-fill" id="gauge-fill"></div>
+          </div>
+        </div>
+        <div class="card-sub">
+          <span>Last msg:</span>
+          <span class="tick" id="pressure-ts">—</span>
+        </div>
+      </div>
+
+      <!-- TEMPERATURE -->
+      <div class="card" id="card-temp" data-status="idle">
+        <div class="card-header">
+          <div class="card-label">Temperature</div>
+          <div class="card-icon" id="temp-icon">🌡</div>
+        </div>
+        <div>
+          <span class="card-value idle-val" id="temp-val">—</span>
+          <span class="card-unit">°C</span>
+        </div>
+        <div class="thermo-wrap">
+          <div class="thermo">
+            <div class="thermo-tube">
+              <div class="thermo-fill" id="thermo-fill"></div>
+            </div>
+            <div class="thermo-bulb"></div>
+          </div>
+          <div class="temp-scale" id="temp-scale">
+            <span id="ts-max">100°</span>
+            <span>50°</span>
+            <span>0°</span>
+            <span id="ts-min">-20°</span>
+          </div>
+        </div>
+        <div class="card-sub">
+          <span>Last msg:</span>
+          <span class="tick" id="temp-ts">—</span>
+        </div>
+      </div>
+
+    </div><!-- /.cards -->
+
+    <!-- Message Log -->
+    <div class="log-panel">
+      <div class="log-panel-header">
+        <span class="log-panel-title">Message Log</span>
+        <button class="log-clear" id="btn-clear">Clear</button>
+      </div>
+      <ul class="log-list" id="log-list">
+        <li class="log-item">
+          <span class="log-time">--:--:--</span>
+          <span class="log-topic">SYSTEM</span>
+          <span class="log-msg">Waiting for connection…</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      SENSORWATCH &nbsp;·&nbsp; MQTT DASHBOARD &nbsp;·&nbsp;
+      <span id="broker-info">not connected</span>
+    </footer>
+
+  </div><!-- /.app -->
+
+  <!-- App logic (must come after DOM + mqtt.js) -->
+  <script src="app.js"></script>
+
+</body>
+</html>
