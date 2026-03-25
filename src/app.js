@@ -241,6 +241,14 @@ function updateLeak(msg) {
 }
 
 // ─── PRESSURE CARD ───────────────────────────────────────────────────────────
+function getPressureText(val) {
+  if      (val < 10)   return "no pressure";
+  else if (val <= 100) return "light touch";
+  else if (val <= 250) return "light squeeze";
+  else if (val <= 350) return "medium squeeze";
+  else                 return "heavy squeeze";
+}
+
 function updatePressure(msg) {
   const val  = parseFloat(msg);
   const card = $("card-pressure");
@@ -253,6 +261,9 @@ function updatePressure(msg) {
 
   el.textContent = val.toFixed(1);
   el.classList.remove("idle-val");
+
+  // Update descriptive text label
+  $("pressure-text").textContent = getPressureText(val);
 
   const pct = clamp(
     (val - ENV.PRESSURE_MIN) / (ENV.PRESSURE_MAX - ENV.PRESSURE_MIN) * 100

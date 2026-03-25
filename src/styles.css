@@ -283,6 +283,29 @@ header {
 .badge.idle { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
 
 /* ════════════════════════════
+   PRESSURE TEXT LABEL
+════════════════════════════ */
+.pressure-text-wrap {
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+.pressure-text {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color var(--transition);
+}
+
+.card[data-status="ok"]   .pressure-text { color: var(--accent-ok); }
+.card[data-status="warn"] .pressure-text { color: var(--accent-warn); }
+.card[data-status="crit"] .pressure-text { color: var(--accent-crit); }
+
+/* ════════════════════════════
    GAUGE BAR (Pressure)
 ════════════════════════════ */
 .gauge-wrap { margin-top: 14px; }
