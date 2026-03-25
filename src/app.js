@@ -10,19 +10,18 @@
  *   - For TLS connections use wss:// instead of ws://
  */
 
-// ─── ENV CONFIG ──────────────────────────────────────────────────────────────
+// ─── ENV (populated from .env file at runtime) ───────────────────────────────
 const ENV = {
-  MQTT_URL:      "",  // ws:// or wss://
+  MQTT_URL:      "",
   MQTT_USERNAME: "",
   MQTT_PASSWORD: "",
   TOPIC_LEAK:     "LEAK",
   TOPIC_PRESSURE: "PRESSURE",
   TOPIC_TEMP:     "TEMP",
-  // Ranges used for gauge / thermometer visuals
   PRESSURE_MIN: 0,
   PRESSURE_MAX: 200,
   TEMP_MIN:    -20,
-  TEMP_MAX:    500,
+  TEMP_MAX:    100,
 };
 
 // ─── DOM HELPERS ─────────────────────────────────────────────────────────────
@@ -32,8 +31,84 @@ const now = () => new Date().toLocaleTimeString();
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let mqttClient = null;
 
+// ─── LOAD .env FILE ──────────────────────────────────────────────────────────
+/**
+ * Fetches configuration from /api/config.
+ *
+ * - Locally: reads from the api/config.js serverless function via
+ *   `vercel dev`, OR falls back to the hardcoded .env file via Python server.
+ * - On Vercel: /api/config is a serverless function that reads from
+ *   the Vercel dashboard environment variables securely on the server.
+ *
+ * The returned JSON keys map 1-to-1 to the ENV object above.
+ */
+async function loadEnv() {
+  try {
+    const response = await fetch("/api/config");
+
+    // If /api/config is unavailable (e.g. plain Python server locally),
+    // silently fall back to the local .env file instead
+    if (response.status === 404) {
+      console.warn("/api/config not found — trying local .env fallback");
+      await loadEnvFile();
+      return;
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Config API error:", err.error || response.statusText);
+      return;
+    }
+
+    const config = await response.json();
+
+    Object.keys(config).forEach(key => {
+      if (key in ENV) {
+        ENV[key] = config[key];
+        const display = key.toLowerCase().includes("password") ? "••••••••" : config[key];
+        console.log(`config loaded: ${key} = ${display}`);
+      }
+    });
+
+  } catch (err) {
+    console.error("Failed to load config:", err.message);
+  }
+}
+
+/**
+ * Local fallback — reads the plain .env file when running
+ * under a simple Python HTTP server (not vercel dev).
+ */
+async function loadEnvFile() {
+  try {
+    const response = await fetch(".env");
+    if (!response.ok) {
+      console.warn(".env file not found — using built-in defaults");
+      return;
+    }
+
+    const text = await response.text();
+    text.split("\n").forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return;
+      const eqIndex = trimmed.indexOf("=");
+      if (eqIndex === -1) return;
+      const key   = trimmed.slice(0, eqIndex).trim();
+      const value = trimmed.slice(eqIndex + 1).trim();
+      const envKey = Object.keys(ENV).find(k => k.toUpperCase() === key.toUpperCase());
+      if (envKey) {
+        ENV[envKey] = (typeof ENV[envKey] === "number") ? Number(value) : value;
+        console.log(`.env loaded: ${envKey} = ${envKey.toLowerCase().includes("password") ? "••••••••" : value}`);
+      }
+    });
+  } catch (err) {
+    console.error("Failed to load .env file:", err.message);
+  }
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadEnv();   // read .env before anything else
   populateForm();
   startClock();
   bindEvents();
